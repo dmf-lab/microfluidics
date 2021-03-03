@@ -1,0 +1,13 @@
+{
+	"autodeskProduct":	"Fusion360",
+	"type":	"addin",
+	"id":	"1d902f11-0d0a-4787-8e8b-b0961fd56773",
+	"author":	"Harry Felton",
+	"description":	{
+		"":	"An add-in to automatically create and edit MicroChannel models."
+	},
+	"version":	"V0.1",
+	"runOnStartup":	false,
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true
+}
