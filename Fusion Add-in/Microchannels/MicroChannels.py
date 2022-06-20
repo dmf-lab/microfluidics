@@ -38,12 +38,17 @@ _angle = adsk.core.ValueCommandInput.cast(None)
 # Cross Channel Input
 _anglex = adsk.core.ValueCommandInput.cast(None)
 
+# Angle Channel Inputs
+_angle2 = adsk.core.ValueCommandInput.cast(None)
+_length2 = adsk.core.ValueCommandInput.cast(None)
+
 # Image inputs
 _imgdroplet = adsk.core.ImageCommandInput.cast(None)
 _imgresistor = adsk.core.ImageCommandInput.cast(None)
 _imgstraight = adsk.core.ImageCommandInput.cast(None)
 _imgyjunction = adsk.core.ImageCommandInput.cast(None)
 _imgcross = adsk.core.ImageCommandInput.cast(None)
+_imgangle = adsk.core.ImageCommandInput.cast(None)
 
 # Joint in inputs
 _jointin = adsk.core.DropDownCommandInput.cast(None)
@@ -139,7 +144,7 @@ class CommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
             
             #Call global variables that are being editted within class
             global _filein, _channelwidthin, _depth, _length
-            global _imgdroplet, _imgresistor, _imgstraight,  _imgyjunction, _imgcross
+            global _imgdroplet, _imgresistor, _imgstraight,  _imgyjunction, _imgcross, _imgangle
             global _errMessage, _stl, _switch
 
             _switch = 1
@@ -171,9 +176,15 @@ class CommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
             _imgcross.isFullWidth = True
             _imgcross.isVisible = True
 
+            # Angle image needs to be updated
+            _imgangle = inputs.addImageCommandInput('Imageangle', '', '%s/resources/images/angle.png' %_filelocation)
+            _imgangle.isFullWidth = True
+            _imgangle.isVisible = False
+
             # Create dropdown input to find filename
             _filein = inputs.addDropDownCommandInput('filename', 'Filename', adsk.core.DropDownStyles.TextListDropDownStyle)
             _fileinItems = _filein.listItems
+            _fileinItems.add('angle',False,'')
             _fileinItems.add('cross_junction', True, '')
             _fileinItems.add('droplet', False, '')
             _fileinItems.add('resistor', False, '')
@@ -402,6 +413,7 @@ def imagehide():
     _imgresistor.isVisible = False
     _imgstraight.isVisible = False
     _imgyjunction.isVisible = False
+    _imgangle.isVisible = False
     
 
     # Gets currently selected file
@@ -418,6 +430,8 @@ def imagehide():
         _imgstraight.isVisible = True
     elif fname == 'y_junction':
         _imgyjunction.isVisible = True
+    elif fname == 'angle':
+        _imgangle.isVisible = True
     else:
         pass
 
@@ -437,6 +451,7 @@ def standardlength():
     listl.append(lengthclass('resistor', 3.5) ) 
     listl.append(lengthclass('straight', 1) ) 
     listl.append(lengthclass('y_junction', 1.5) )
+    listl.append(lengthclass('angle', 1.5) )
 
     #Set up position list
     pos=[]
@@ -471,6 +486,7 @@ def channelfunc(handler, inputs):
         resistorfunc(handler, inputs, ui, userParams)
         straightfunc(handler, inputs, ui, userParams)
         yfunc(handler, inputs, ui, userParams)
+        anglefunc(handler, inputs, ui, userParams)
 
 
     except:
@@ -677,6 +693,42 @@ def straightfunc(handler, inputs, ui, userParams):
     except:
         ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
 
+def anglefunc(handler, inputs, ui, userParams):
+    try:
+        global _angle2, _length2
+
+        if handler == 'create':
+            ang = 45/180 * math.pi
+            length2 = 1
+            _angle2 = inputs.addValueInput('angle', 'Angle', 'deg', adsk.core.ValueInput.createByReal(ang))
+            _length2 = inputs.addValueInput('length2', 'Length2', 'mm', adsk.core.ValueInput.createByReal(ang))
+        
+        elif handler == 'execute' and _filein.selectedItem.name == 'angle':
+            validcheck = _angle2.isValidExpression
+            if validcheck:
+                angle = _angle2.value*180/math.pi
+                userParams.itemByName('angle').expression = '%f' %angle
+            validcheck = _length2.isValidExpression
+            if validcheck:
+                length2 = _length2.value*10
+                userParams.itemByName('length2').expression = '%f' %length2
+
+        if handler == 'inputchanged' or handler == 'create':
+            if _filein.selectedItem.name != 'angle':
+                _angle2.isVisible = False
+                _length2.isVisible = False
+            else:
+                _angle2.isVisible = True
+                _length2.isVisible = True
+
+        if handler == 'error' and _filein.selectedItem.name == 'angle':
+            if _angle2.value < (10*math.pi)/180 or _angle.value > (150*math.pi)/180:
+                _errMessage.text = 'Angle must be greater than 0 and less than 180 degrees'
+                inputs.areInputsValid = False
+                return
+    except:
+        ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
+
 def yfunc(handler, inputs, ui, userParams):
     try:
 
@@ -776,6 +828,11 @@ def joints(handler, inputs):
                 _jointb.isVisible = True
                 _jointc.isVisible = True
                 _jointd.isVisible = True
+            elif _filein.selectedItem.name == 'angle':
+                _jointa.isVisible = True
+                _jointb.isVisible = True
+                _jointc.isVisible = False
+                _jointd.isVisible = False
     except:
         ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
 
@@ -951,6 +1008,34 @@ def jointcreate(app, ui, importManager, userParams):
                 allParams.itemByName('xpos_3').expression = '%f*10' %pointgeom.x
                 allParams.itemByName('jointdepth_3').expression = 'depth'
                 allParams.itemByName('ypos_3').expression = '%f*-10' %pointgeom.y
+
+            if _filein.selectedItem.name == 'angle':
+                # Joint 1
+                allParams.itemByName('ypos').expression = 'yoffset'
+                allParams.itemByName('jointangle').expression = '180'
+                allParams.itemByName('xpos').expression = 'xoffset'
+                allParams.itemByName('jointdepth').expression = 'depth'
+                # Joint 2
+
+                if _angle2.value>=math.pi/2:
+                    allParams.itemByName('ypos_1').expression = '0'
+                    allParams.itemByName('xpos_1').expression = 'length+length2*sin(angle-90)'
+                    allParams.itemByName('jointangle_1').expression = 'angle+180'
+                    allParams.itemByName('jointdepth_1').expression = 'depth'
+                    allParams.itemByName('xoffset').expression = '0'
+                else:
+                    allParams.itemByName('ypos_1').expression = '0'
+                    allParams.itemByName('xpos_1').expression = 'length2*cos(angle)-length'
+                    allParams.itemByName('jointangle_1').expression = 'angle+180'
+                    allParams.itemByName('jointdepth_1').expression = 'depth'
+
+                    if (_length2.value*math.cos(_angle2.value))>_length.value:
+                        allParams.itemByName('xoffset').expression = 'length2*cos(angle)-length'
+                        allParams.itemByName('xpos_1').expression = '0'
+                    else:
+                        allParams.itemByName('xoffset').expression = '0'
+
+
 
             # Combines joints and body
             target = rootComp.bRepBodies.item(0)
